@@ -150,10 +150,14 @@ void loop()
 {
 
   /* Get elapsed time since beginning, in seconds */
-  currentTime = (millis() - startTime) / 1000;
+  currentTime = millis() - startTime;
 
   // Creating file object
-  File testFile = SD.open("/TEST_01.txt", FILE_WRITE);
+  File testFile = SD.open("/TEST_06.txt", FILE_APPEND);
+
+  // Writing currentTime
+  testFile.print(currentTime);
+  testFile.print(",");
 
   /* Get new sensor events with the readings */
   sensors_event_t a, g, temp;
@@ -216,12 +220,14 @@ void loop()
   /* Serial.print(F("Approx altitude = "));
   Serial.print(bmp.readAltitude(1013)); */
   // The "1019.66" is the pressure(hPa) at sea level in day in your region
-  testFile.print(bmp.readAltitude(1013));
-  testFile.print(","); // If you don't know it, modify it until you get your current altitude
+  testFile.println(bmp.readAltitude(1013));
+  // testFile.print(","); // If you don't know it, modify it until you get your current altitude
   /* Serial.println(" m"); */
 
   /* Serial.println(); */
-  testFile.println(currentTime);
-  testFile.flush();
-  delay(500);
+  Serial.print(currentTime);
+  Serial.print(">>>");
+  testFile.close();
+  Serial.println("Loop foi.");
+  delay(5);
 }
