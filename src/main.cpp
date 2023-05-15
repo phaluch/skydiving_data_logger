@@ -1,91 +1,163 @@
-#include <TinyGPSPlus.h>
-/* 
-   This sample sketch should be the first you try out when you are testing a TinyGPSPlus
-   (TinyGPSPlus) installation.  In normal use, you feed TinyGPSPlus objects characters from
-   a serial NMEA GPS device, but this example uses static strings for simplicity.
-*/
+#include <TinyGPS++.h>
+#include <HardwareSerial.h>
+#include <Wire.h>
+#include <SPI.h>
+#include <SD.h>
+#include <Arduino.h>
+#include <Adafruit_Sensor.h>
+#include <Adafruit_BMP280.h>
+#include <Adafruit_MPU6050.h>
 
-// A sample NMEA stream.
-const char *gpsStream =
-  "$GPRMC,045103.000,A,3014.1984,N,09749.2872,W,0.67,161.46,030913,,,A*7C\r\n"
-  "$GPGGA,045104.000,3014.1985,N,09749.2873,W,1,09,1.2,211.6,M,-22.5,M,,0000*62\r\n"
-  "$GPRMC,045200.000,A,3014.3820,N,09748.9514,W,36.88,65.02,030913,,,A*77\r\n"
-  "$GPGGA,045201.000,3014.3864,N,09748.9411,W,1,10,1.2,200.8,M,-22.5,M,,0000*6C\r\n"
-  "$GPRMC,045251.000,A,3014.4275,N,09749.0626,W,0.51,217.94,030913,,,A*7D\r\n"
-  "$GPGGA,045252.000,3014.4273,N,09749.0628,W,1,09,1.3,206.9,M,-22.5,M,,0000*6F\r\n";
+#include <TinyGPSPlus.h>
+#include <SoftwareSerial.h>
+/*
+   This sample code tracks satellite elevations using TinyGPSCustom objects.
+
+   Satellite numbers and elevations are not normally tracked by TinyGPSPlus, but 
+   by using TinyGPSCustom we get around this.
+
+   It requires the use of SoftwareSerial and assumes that you have a
+   4800-baud serial GPS device hooked up on pins 4(RX) and 3(TX).
+*/
+static const int RXPin = 16, TXPin = 17;
+static const uint32_t GPSBaud = 4800;
+static const int MAX_SATELLITES = 40;
+static const int PAGE_LENGTH = 40;
 
 // The TinyGPSPlus object
 TinyGPSPlus gps;
 
+// The serial connection to the GPS device
+SoftwareSerial ss(RXPin, TXPin);
+
+TinyGPSCustom totalGPGSVMessages(gps, "GPGSV", 1); // $GPGSV sentence, first element
+TinyGPSCustom messageNumber(gps, "GPGSV", 2);      // $GPGSV sentence, second element
+TinyGPSCustom satNumber[4]; // to be initialized later
+TinyGPSCustom elevation[4];
+bool anyChanges = false;
+unsigned long linecount = 0;
+
+struct
+{
+  int elevation;
+  bool active;
+} sats[MAX_SATELLITES];
+
+void IntPrint(int n, int len)
+{
+  int digs = n < 0 ? 2 : 1;
+  for (int i=10; i<=abs(n); i*=10)
+    ++digs;
+  while (digs++ < len)
+    Serial.print(F(" "));
+  Serial.print(n);
+  Serial.print(F(" "));
+}
+
+void TimePrint()
+{
+  if (gps.time.isValid())
+  {
+    if (gps.time.hour() < 10)
+      Serial.print(F("0"));
+    Serial.print(gps.time.hour());
+    Serial.print(F(":"));
+    if (gps.time.minute() < 10)
+      Serial.print(F("0"));
+    Serial.print(gps.time.minute());
+    Serial.print(F(":"));
+    if (gps.time.second() < 10)
+      Serial.print(F("0"));
+    Serial.print(gps.time.second());
+    Serial.print(F(" "));
+  }
+  else
+  {
+    Serial.print(F("(unknown)"));
+  }
+}
+
+void printHeader()
+{
+  Serial.println();
+  Serial.print(F("Time     "));
+  for (int i=0; i<MAX_SATELLITES; ++i)
+  {
+    Serial.print(F(" "));
+    IntPrint(i+1, 2);
+  }
+  Serial.println();
+  Serial.print(F("---------"));
+  for (int i=0; i<MAX_SATELLITES; ++i)
+    Serial.print(F("----"));
+  Serial.println();
+}
+
 void setup()
 {
   Serial.begin(115200);
+  ss.begin(GPSBaud);
 
-  Serial.println(F("BasicExample.ino"));
-  Serial.println(F("Basic demonstration of TinyGPSPlus (no device needed)"));
+  Serial.println(F("SatElevTracker.ino"));
+  Serial.println(F("Displays GPS satellite elevations as they change"));
   Serial.print(F("Testing TinyGPSPlus library v. ")); Serial.println(TinyGPSPlus::libraryVersion());
   Serial.println(F("by Mikal Hart"));
   Serial.println();
-
-  while (*gpsStream)
-    if (gps.encode(*gpsStream++))
-      displayInfo();
-
-  Serial.println();
-  Serial.println(F("Done."));
+  
+  // Initialize all the uninitialized TinyGPSCustom objects
+  for (int i=0; i<4; ++i)
+  {
+    satNumber[i].begin(gps, "GPGSV", 4 + 4 * i); // offsets 4, 8, 12, 16
+    elevation[i].begin(gps, "GPGSV", 5 + 4 * i); // offsets 5, 9, 13, 17
+  }
+  Serial.println(F("Setup finished."));
 }
 
 void loop()
 {
-}
-
-void displayInfo()
-{
-  Serial.print(F("Location: ")); 
-  if (gps.location.isValid())
+  // Dispatch incoming characters
+  if (ss.available() > 0)
   {
-    Serial.print(gps.location.lat(), 6);
-    Serial.print(F(","));
-    Serial.print(gps.location.lng(), 6);
+    Serial.println(F("ss.available() > 0"));
+    gps.encode(ss.read());
+    Serial.println(F("gps.encode(ss.read());"));
+    if (totalGPGSVMessages.isUpdated())
+    {
+      Serial.println(F(totalGPGSVMessages.isUpdated()));
+      for (int i=0; i<4; ++i)
+      {
+        int no = atoi(satNumber[i].value());
+        if (no >= 1 && no <= MAX_SATELLITES)
+        {
+          int elev = atoi(elevation[i].value());
+          sats[no-1].active = true;
+          if (sats[no-1].elevation != elev)
+          {
+            sats[no-1].elevation = elev;
+            anyChanges = true;
+          }
+        }
+      }
+      
+      int totalMessages = atoi(totalGPGSVMessages.value());
+      int currentMessage = atoi(messageNumber.value());
+      if (totalMessages == currentMessage && anyChanges)
+      {
+        if (linecount++ % PAGE_LENGTH == 0)
+          printHeader();
+        TimePrint();
+        for (int i=0; i<MAX_SATELLITES; ++i)
+        {
+          Serial.print(F(" "));
+          if (sats[i].active)
+            IntPrint(sats[i].elevation, 2);
+          else
+            Serial.print(F("   "));
+          sats[i].active = false;
+        }
+        Serial.println();
+        anyChanges = false;
+      }
+    }
   }
-  else
-  {
-    Serial.print(F("INVALID"));
-  }
-
-  Serial.print(F("  Date/Time: "));
-  if (gps.date.isValid())
-  {
-    Serial.print(gps.date.month());
-    Serial.print(F("/"));
-    Serial.print(gps.date.day());
-    Serial.print(F("/"));
-    Serial.print(gps.date.year());
-  }
-  else
-  {
-    Serial.print(F("INVALID"));
-  }
-
-  Serial.print(F(" "));
-  if (gps.time.isValid())
-  {
-    if (gps.time.hour() < 10) Serial.print(F("0"));
-    Serial.print(gps.time.hour());
-    Serial.print(F(":"));
-    if (gps.time.minute() < 10) Serial.print(F("0"));
-    Serial.print(gps.time.minute());
-    Serial.print(F(":"));
-    if (gps.time.second() < 10) Serial.print(F("0"));
-    Serial.print(gps.time.second());
-    Serial.print(F("."));
-    if (gps.time.centisecond() < 10) Serial.print(F("0"));
-    Serial.print(gps.time.centisecond());
-  }
-  else
-  {
-    Serial.print(F("INVALID"));
-  }
-
-  Serial.println();
 }
