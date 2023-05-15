@@ -20,7 +20,7 @@ void setup() {
     return;
   }
 
-  File testFile = SD.open("/SDTest.txt", FILE_WRITE);
+  File testFile = SD.open("/Data.txt", FILE_WRITE);
   if (testFile) {
     testFile.println("Hello ESP32 SD");
     testFile.close();
