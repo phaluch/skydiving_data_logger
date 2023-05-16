@@ -26,69 +26,88 @@ SoftwareSerial ss(RXPin, TXPin);
 // is being "fed".
 static void smartDelay(unsigned long ms)
 {
+  Serial.println("Starting smartDelay");
   unsigned long start = millis();
   do
   {
     while (ss.available())
+    {
+      Serial.println("Serial data available, encoding GPS data");
       gps.encode(ss.read());
-  } while (millis() - start < ms);
+    }
+  } while (millis() - start < ms); // Loop until the specified delay time has passed
+  Serial.println("smartDelay complete");
 }
 
 static void printFloat(float val, bool valid, int len, int prec)
 {
-  if (!valid)
+  Serial.println("Starting printFloat");
+  if (!valid) // Check if the value is valid
   {
+    Serial.println("Invalid value, printing *");
     while (len-- > 1)
       Serial.print('*');
     Serial.print(' ');
   }
   else
   {
+    Serial.println("Valid value, printing float");
     Serial.print(val, prec);
     int vi = abs((int)val);
-    int flen = prec + (val < 0.0 ? 2 : 1); // . and -
+    int flen = prec + (val < 0.0 ? 2 : 1); // Count the number of characters needed for the integer part, decimal point, and potential minus sign
     flen += vi >= 1000 ? 4 : vi >= 100 ? 3
                          : vi >= 10    ? 2
-                                       : 1;
+                                       : 1; // Add the number of digits in the integer part
     for (int i = flen; i < len; ++i)
-      Serial.print(' ');
+      Serial.print(' '); // Print spaces to fill the field width
   }
   smartDelay(0);
+  Serial.println("printFloat complete");
 }
 
 static void printInt(unsigned long val, bool valid, int len)
 {
+  Serial.println("Starting printInt");
   char sz[32] = "*****************";
-  if (valid)
+  if (valid) // Check if the value is valid
+  {
+    Serial.println("Valid value, printing integer");
     sprintf(sz, "%ld", val);
+  }
   sz[len] = 0;
   for (int i = strlen(sz); i < len; ++i)
-    sz[i] = ' ';
+    sz[i] = ' '; // Print spaces to fill the field width
   if (len > 0)
     sz[len - 1] = ' ';
   Serial.print(sz);
   smartDelay(0);
+  Serial.println("printInt complete");
 }
 
 static void printDateTime(TinyGPSDate &d, TinyGPSTime &t)
 {
-  if (!d.isValid())
+  Serial.println("Starting printDateTime");
+  if (!d.isValid()) // Check if the date is valid
   {
+    Serial.println("Invalid date, printing *");
     Serial.print(F("********** "));
   }
   else
   {
+    Serial.println("Valid date, printing date");
     char sz[32];
     sprintf(sz, "%02d/%02d/%02d ", d.month(), d.day(), d.year());
     Serial.print(sz);
   }
 
-  if (!t.isValid())
+  if (!t.isValid()) // Check if the time is valid
   {
+    Serial.println("Invalid time, printing *");
     Serial.print(F("******** "));
   }
   else
   {
+    Serial.println("Valid time, printing time");
     char sz[32];
     sprintf(sz, "%02d:%02d:%02d ", t.hour(), t.minute(), t.second());
     Serial.print(sz);
@@ -96,10 +115,12 @@ static void printDateTime(TinyGPSDate &d, TinyGPSTime &t)
 
   printInt(d.age(), d.isValid(), 5);
   smartDelay(0);
+  Serial.println("printDateTime complete");
 }
 
 static void printStr(const char *str, int len)
 {
+  Serial.println("Starting printStr");
   int slen = strlen(str);
   for (int i = 0; i < len; ++i)
     Serial.print(i < slen ? str[i] : ' ');
@@ -125,19 +146,19 @@ void setup()
 void loop()
 {
   Serial.println("Starting loop");
-  
+
   static const double BRASILIA_LAT = -15.73905, BRASILIA_LON = -47.89370;
   Serial.println("Brasilia coordinates set");
 
   printInt(gps.satellites.value(), gps.satellites.isValid(), 5);
   Serial.println("Satellite value printed");
-  
+
   printFloat(gps.hdop.hdop(), gps.hdop.isValid(), 6, 1);
   Serial.println("HDOP value printed");
 
   printFloat(gps.location.lat(), gps.location.isValid(), 11, 6);
   Serial.println("Latitude value printed");
-  
+
   printFloat(gps.location.lng(), gps.location.isValid(), 12, 6);
   Serial.println("Longitude value printed");
 
@@ -146,10 +167,10 @@ void loop()
 
   printDateTime(gps.date, gps.time);
   Serial.println("Date and time printed");
-  
+
   printFloat(gps.altitude.meters(), gps.altitude.isValid(), 7, 2);
   Serial.println("Altitude printed");
-  
+
   printFloat(gps.course.deg(), gps.course.isValid(), 7, 2);
   Serial.println("Course degrees printed");
 
@@ -194,13 +215,14 @@ void loop()
   Serial.println();
   Serial.println("Printed all values, about to delay");
 
-  smartDelay(1000);
+  smartDelay(30000);
   Serial.println("Delay complete");
 
-  if (millis() > 5000 && gps.charsProcessed() < 10) {
+  if (millis() > 5000 && gps.charsProcessed() < 10)
+  {
     Serial.println(F("No GPS data received: check wiring"));
     Serial.println("GPS data check complete");
   }
-  
+
   Serial.println("End of loop");
 }
