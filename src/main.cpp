@@ -124,18 +124,40 @@ void setup()
 
 void loop()
 {
+  Serial.println("Starting loop");
+  
   static const double BRASILIA_LAT = -15.73905, BRASILIA_LON = -47.89370;
+  Serial.println("Brasilia coordinates set");
 
   printInt(gps.satellites.value(), gps.satellites.isValid(), 5);
+  Serial.println("Satellite value printed");
+  
   printFloat(gps.hdop.hdop(), gps.hdop.isValid(), 6, 1);
+  Serial.println("HDOP value printed");
+
   printFloat(gps.location.lat(), gps.location.isValid(), 11, 6);
+  Serial.println("Latitude value printed");
+  
   printFloat(gps.location.lng(), gps.location.isValid(), 12, 6);
+  Serial.println("Longitude value printed");
+
   printInt(gps.location.age(), gps.location.isValid(), 5);
+  Serial.println("Location age printed");
+
   printDateTime(gps.date, gps.time);
+  Serial.println("Date and time printed");
+  
   printFloat(gps.altitude.meters(), gps.altitude.isValid(), 7, 2);
+  Serial.println("Altitude printed");
+  
   printFloat(gps.course.deg(), gps.course.isValid(), 7, 2);
+  Serial.println("Course degrees printed");
+
   printFloat(gps.speed.kmph(), gps.speed.isValid(), 6, 2);
+  Serial.println("Speed printed");
+
   printStr(gps.course.isValid() ? TinyGPSPlus::cardinal(gps.course.deg()) : "*** ", 6);
+  Serial.println("Course direction printed");
 
   unsigned long distanceKmToBrasilia =
       (unsigned long)TinyGPSPlus::distanceBetween(
@@ -145,6 +167,7 @@ void loop()
           BRASILIA_LON) /
       1000;
   printInt(distanceKmToBrasilia, gps.location.isValid(), 9);
+  Serial.println("Distance to Brasilia printed");
 
   double courseToBrasilia =
       TinyGPSPlus::courseTo(
@@ -152,20 +175,32 @@ void loop()
           gps.location.lng(),
           BRASILIA_LAT,
           BRASILIA_LON);
-
   printFloat(courseToBrasilia, gps.location.isValid(), 7, 2);
+  Serial.println("Course to Brasilia printed");
 
   const char *cardinalToBrasilia = TinyGPSPlus::cardinal(courseToBrasilia);
-
   printStr(gps.location.isValid() ? cardinalToBrasilia : "*** ", 6);
+  Serial.println("Cardinal direction to Brasilia printed");
 
   printInt(gps.charsProcessed(), true, 6);
+  Serial.println("Characters processed printed");
+
   printInt(gps.sentencesWithFix(), true, 10);
+  Serial.println("Sentences with fix printed");
+
   printInt(gps.failedChecksum(), true, 9);
+  Serial.println("Failed checksums printed");
+
   Serial.println();
+  Serial.println("Printed all values, about to delay");
 
   smartDelay(1000);
+  Serial.println("Delay complete");
 
-  if (millis() > 5000 && gps.charsProcessed() < 10)
+  if (millis() > 5000 && gps.charsProcessed() < 10) {
     Serial.println(F("No GPS data received: check wiring"));
+    Serial.println("GPS data check complete");
+  }
+  
+  Serial.println("End of loop");
 }
